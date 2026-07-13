@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charger Map - TMA</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <h1>⚡ EV Charger Map</h1>
+            <p class="subtitle">Find electric vehicle charging stations near you</p>
+        </header>
+        
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="🔍 Search location...">
+                <button id="search-btn">Search</button>
+            </div>
+            <div class="filters">
+                <select id="charger-type">
+                    <option value="all">All Types</option>
+                    <option value="fast">Fast Chargers</option>
+                    <option value="standard">Standard Chargers</option>
+                    <option value="tesla">Tesla Superchargers</option>
+                </select>
+                <select id="availability">
+                    <option value="all">All Availability</option>
+                    <option value="available">Available Now</option>
+                    <option value="busy">Currently Busy</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="charger-list">
+            <h3>Nearby Chargers</h3>
+            <div id="charger-items"></div>
+        </div>
+        
+        <div class="user-location-btn">
+            <button id="locate-me">📍 Locate Me</button>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
