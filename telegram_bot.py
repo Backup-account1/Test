@@ -307,68 +307,109 @@ async def fetch_analyzed_records_from_api(update: Update, limit: int, offset: in
     await fetch_analyzed_records(update, limit, offset)
 
 
-async def format_analyzed_records(update: Update, data: List[Dict[str, Any]], limit: int, offset: int) -> None:
-    """Format and send analyzed records."""
-    if not data:
+async def format_analyzed_records(update: Update, data: Dict[str, Any], limit: int, offset: int) -> None:
+    """Format and send analyzed records. Handles response with Count and Records fields."""
+    # Extract records from the response
+    # The API returns: {"Count": X, "Records": [{"SSCC": "...", "Msg": "..."}, ...]}
+    records = []
+    total_count = 0
+    
+    if isinstance(data, dict):
+        records = data.get("Records", [])
+        total_count = data.get("Count", len(records))
+    elif isinstance(data, list):
+        records = data
+        total_count = len(records)
+    
+    if not records:
         await update.message.reply_text(
             f"📊 **Analyzed Records**\n\n"
-            f"Limit: {limit}, Offset: {offset}\n\n"
-            "No records found."
+            f"Limit: {limit}, Offset: {offset}\n"
+            f"Total available: {total_count}\n\n"
+            "No records found in this page."
         )
         return
     
     response_text = f"📊 **Analyzed Records**\n\n"
     response_text += f"Limit: {limit}, Offset: {offset}\n"
-    response_text += f"Total: {len(data)} records\n\n"
+    response_text += f"Total available: {total_count}\n"
+    response_text += f"Returned: {len(records)} records\n\n"
     
-    for i, record in enumerate(data[:50], 1):  # Show first 50 to avoid message length limits
+    # Show records (limit to 50 to avoid message length limits)
+    max_to_show = 50
+    for i, record in enumerate(records[:max_to_show], 1):
         sscc = record.get("SSCC", "N/A")
         msg = record.get("Msg", "N/A")
         response_text += f"{i}. **SSCC**: `{sscc}`\n"
         response_text += f"   **Msg**: `{msg}`\n\n"
     
-    if len(data) > 50:
-        response_text += f"\n... and {len(data) - 50} more records"
+    if len(records) > max_to_show:
+        response_text += f"\n... and {len(records) - max_to_show} more records in this page"
+    
+    # Add total info
+    if total_count > (offset + len(records)):
+        remaining = total_count - (offset + len(records))
+        response_text += f"\n\n📈 {remaining} more records available"
     
     await update.message.reply_text(response_text, parse_mode="Markdown")
 
 
-async def format_analyzed_records_callback(query, data: List[Dict[str, Any]], limit: int, offset: int) -> None:
-    """Format and send analyzed records from callback context."""
-    if not data:
+async def format_analyzed_records_callback(query, data: Dict[str, Any], limit: int, offset: int) -> None:
+    """Format and send analyzed records from callback context. Handles response with Count and Records fields."""
+    # Extract records from the response
+    records = []
+    total_count = 0
+    
+    if isinstance(data, dict):
+        records = data.get("Records", [])
+        total_count = data.get("Count", len(records))
+    elif isinstance(data, list):
+        records = data
+        total_count = len(records)
+    
+    if not records:
         await query.edit_message_text(
             f"📊 **Analyzed Records**\n\n"
-            f"Limit: {limit}, Offset: {offset}\n\n"
-            "No records found.",
+            f"Limit: {limit}, Offset: {offset}\n"
+            f"Total available: {total_count}\n\n"
+            "No records found in this page.",
             parse_mode="Markdown",
         )
         return
     
     response_text = f"📊 **Analyzed Records**\n\n"
     response_text += f"Limit: {limit}, Offset: {offset}\n"
-    response_text += f"Total: {len(data)} records\n\n"
+    response_text += f"Total available: {total_count}\n"
+    response_text += f"Returned: {len(records)} records\n\n"
     
-    for i, record in enumerate(data[:50], 1):
+    # Show records (limit to 50 to avoid message length limits)
+    max_to_show = 50
+    for i, record in enumerate(records[:max_to_show], 1):
         sscc = record.get("SSCC", "N/A")
         msg = record.get("Msg", "N/A")
         response_text += f"{i}. **SSCC**: `{sscc}`\n"
         response_text += f"   **Msg**: `{msg}`\n\n"
     
-    if len(data) > 50:
-        response_text += f"\n... and {len(data) - 50} more records"
+    if len(records) > max_to_show:
+        response_text += f"\n... and {len(records) - max_to_show} more records in this page"
+    
+    # Add total info
+    if total_count > (offset + len(records)):
+        remaining = total_count - (offset + len(records))
+        response_text += f"\n\n📈 {remaining} more records available"
     
     # Add quick navigation buttons
     keyboard = []
     
     # Previous offset
-    if offset >= 100:
-        prev_offset = max(0, offset - 100)
+    if offset >= limit:
+        prev_offset = max(0, offset - limit)
         keyboard.append([
             InlineKeyboardButton("⬅️ Previous", callback_data=f"quick_limit_offset_{limit}_{prev_offset}"),
         ])
     
     # Next offset
-    if len(data) >= limit:
+    if (offset + limit) < total_count:
         next_offset = offset + limit
         keyboard.append([
             InlineKeyboardButton("Next ➡️", callback_data=f"quick_limit_offset_{limit}_{next_offset}"),

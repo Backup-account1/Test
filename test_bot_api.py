@@ -84,10 +84,16 @@ def main():
     print("3. Testing getanalyzed endpoint...")
     result = test_get_analyzed(limit=500, offset=0)
     if result:
-        if isinstance(result, list):
-            print(f"   ✅ Found {len(result)} analyzed records")
-            if result:
-                print(f"   First record: {json.dumps(result[0], indent=2)[:100]}...")
+        if isinstance(result, dict):
+            count = result.get("Count", 0)
+            records = result.get("Records", [])
+            print(f"   ✅ Total count: {count}, Records returned: {len(records)}")
+            if records:
+                print(f"   First 3 records:")
+                for i, record in enumerate(records[:3], 1):
+                    sscc = record.get("SSCC", "N/A")
+                    msg = record.get("Msg", "N/A")
+                    print(f"      {i}. SSCC: {sscc}, Msg: {msg}")
         else:
             print(f"   ✅ Response: {json.dumps(result, indent=2)[:200]}...")
     else:
@@ -99,8 +105,10 @@ def main():
     for limit, offset in [(20, 0), (50, 100), (100, 0)]:
         result = test_get_analyzed(limit=limit, offset=offset)
         if result:
-            if isinstance(result, list):
-                print(f"   ✅ limit={limit}, offset={offset}: {len(result)} records")
+            if isinstance(result, dict):
+                count = result.get("Count", 0)
+                records = result.get("Records", [])
+                print(f"   ✅ limit={limit}, offset={offset}: {len(records)} records (total: {count})")
             else:
                 print(f"   ✅ limit={limit}, offset={offset}: Success")
         else:
