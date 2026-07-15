@@ -42,11 +42,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
     keyboard = [
         [
-            InlineKeyboardButton("Get Camera Result", callback_data="cmd_getcamerares"),
-            InlineKeyboardButton("Get Analyzed Records", callback_data="cmd_getanalyzed"),
+            InlineKeyboardButton("📦 Get Camera Result", callback_data="cmd_getcamerares"),
+            InlineKeyboardButton("📊 Get Analyzed Records", callback_data="cmd_getanalyzed"),
         ],
         [
-            InlineKeyboardButton("Help", callback_data="cmd_help"),
+            InlineKeyboardButton("❓ Help", callback_data="cmd_help"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -76,9 +76,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 • Example: `/getanalyzed 500 0`
 • Returns: Paginated list of analyzed records (SSCC and Msg only)
 
-**Predefined Options:**
-• Limits: 20, 50, 100, 500
-• Offsets: 0, 100, 200, 500, 1000
+**Interactive Buttons for getanalyzed:**
+• Click "📊 Get Analyzed Records" button
+• Select from predefined limits: 20, 50, 100, 500
+• Select from predefined offsets: 0, 100, 200, 500, 1000
+• Use Previous/Next buttons to navigate through pages
+• Quick limit change buttons available
 
 **Test SSCC Values:**
 • `111` - Good result
@@ -110,11 +113,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         context.user_data["awaiting_sscc"] = True
         
-    elif data == "cmd_getanalyzed":
-        await show_limit_options(query)
+    elif data == "cmd_getanalyzed" or data == "cmd_start":
+        await show_analyzed_menu(query)
         
     elif data == "cmd_help":
         await help_command(update, context)
+        
+    elif data == "back_to_analyzed_menu":
+        await show_analyzed_menu(query)
+        
+    elif data == "back_to_limit_select":
+        await show_limit_options(query)
+        
+    elif data == "cmd_custom_analyzed":
+        await show_limit_options(query)
         
     elif data.startswith("limit_"):
         limit = int(data.replace("limit_", ""))
@@ -131,6 +143,63 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         limit = int(parts[0])
         offset = int(parts[1])
         await fetch_analyzed_records(query, limit, offset)
+        
+    elif data.startswith("nav_"):
+        # Navigation: nav_<direction>_<limit>_<offset>
+        parts = data.replace("nav_", "").split("_")
+        direction = parts[0]
+        limit = int(parts[1])
+        offset = int(parts[2])
+        
+        if direction == "prev":
+            new_offset = max(0, offset - limit)
+        elif direction == "next":
+            new_offset = offset + limit
+        else:
+            new_offset = offset
+        
+        await fetch_analyzed_records(query, limit, new_offset)
+        
+    elif data.startswith("change_limit_"):
+        # change_limit_<new_limit>_<current_offset>
+        parts = data.replace("change_limit_", "").split("_")
+        new_limit = int(parts[0])
+        current_offset = int(parts[1])
+        # Adjust offset to stay on same page when changing limit
+        new_offset = (current_offset // new_limit) * new_limit
+        await fetch_analyzed_records(query, new_limit, new_offset)
+    
+    elif data == "no_op":
+        # Do nothing, just acknowledge the click
+        pass
+
+
+async def show_analyzed_menu(query) -> None:
+    """Show main menu for analyzed records with quick action buttons."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🔢 Quick: Last 20", callback_data="quick_limit_offset_20_0"),
+            InlineKeyboardButton("🔢 Quick: Last 50", callback_data="quick_limit_offset_50_0"),
+        ],
+        [
+            InlineKeyboardButton("🔢 Quick: Last 100", callback_data="quick_limit_offset_100_0"),
+            InlineKeyboardButton("🔢 Quick: Last 500", callback_data="quick_limit_offset_500_0"),
+        ],
+        [
+            InlineKeyboardButton("⚙️ Custom Limit & Offset", callback_data="cmd_custom_analyzed"),
+        ],
+        [
+            InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="cmd_start"),
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "📊 **Get Analyzed Records**\n\n"
+        "Choose an option:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
 
 
 async def show_limit_options(query) -> None:
@@ -140,12 +209,16 @@ async def show_limit_options(query) -> None:
             InlineKeyboardButton(f"{limit}", callback_data=f"limit_{limit}")
             for limit in LIMIT_OPTIONS
         ],
+        [
+            InlineKeyboardButton("⬅️ Back", callback_data="back_to_analyzed_menu"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
         "📊 **Select Limit:**\n\n"
-        "Choose how many records to fetch:",
+        "Choose how many records to fetch per page:",
         reply_markup=reply_markup,
+        parse_mode="Markdown",
     )
 
 
@@ -156,12 +229,16 @@ async def show_offset_options(query, limit: int) -> None:
             InlineKeyboardButton(f"{offset}", callback_data=f"offset_{offset}")
             for offset in OFFSET_OPTIONS
         ],
+        [
+            InlineKeyboardButton("⬅️ Back", callback_data="back_to_limit_select"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(
         f"📊 **Selected Limit: {limit}**\n\n"
-        "Choose offset:",
+        "Choose starting offset:",
         reply_markup=reply_markup,
+        parse_mode="Markdown",
     )
 
 
@@ -310,7 +387,6 @@ async def fetch_analyzed_records_from_api(update: Update, limit: int, offset: in
 async def format_analyzed_records(update: Update, data: Dict[str, Any], limit: int, offset: int) -> None:
     """Format and send analyzed records. Handles response with Count and Records fields."""
     # Extract records from the response
-    # The API returns: {"Count": X, "Records": [{"SSCC": "...", "Msg": "..."}, ...]}
     records = []
     total_count = 0
     
@@ -326,7 +402,7 @@ async def format_analyzed_records(update: Update, data: Dict[str, Any], limit: i
             f"📊 **Analyzed Records**\n\n"
             f"Limit: {limit}, Offset: {offset}\n"
             f"Total available: {total_count}\n\n"
-            "No records found in this page."
+            "No records found in this page.",
         )
         return
     
@@ -355,7 +431,7 @@ async def format_analyzed_records(update: Update, data: Dict[str, Any], limit: i
 
 
 async def format_analyzed_records_callback(query, data: Dict[str, Any], limit: int, offset: int) -> None:
-    """Format and send analyzed records from callback context. Handles response with Count and Records fields."""
+    """Format and send analyzed records from callback context with interactive navigation."""
     # Extract records from the response
     records = []
     total_count = 0
@@ -368,11 +444,18 @@ async def format_analyzed_records_callback(query, data: Dict[str, Any], limit: i
         total_count = len(records)
     
     if not records:
+        keyboard = [
+            [
+                InlineKeyboardButton("⬅️ Back to Menu", callback_data="cmd_getanalyzed"),
+            ],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             f"📊 **Analyzed Records**\n\n"
             f"Limit: {limit}, Offset: {offset}\n"
             f"Total available: {total_count}\n\n"
             "No records found in this page.",
+            reply_markup=reply_markup,
             parse_mode="Markdown",
         )
         return
@@ -380,7 +463,7 @@ async def format_analyzed_records_callback(query, data: Dict[str, Any], limit: i
     response_text = f"📊 **Analyzed Records**\n\n"
     response_text += f"Limit: {limit}, Offset: {offset}\n"
     response_text += f"Total available: {total_count}\n"
-    response_text += f"Returned: {len(records)} records\n\n"
+    response_text += f"Showing: {len(records)} records\n\n"
     
     # Show records (limit to 50 to avoid message length limits)
     max_to_show = 50
@@ -391,46 +474,56 @@ async def format_analyzed_records_callback(query, data: Dict[str, Any], limit: i
         response_text += f"   **Msg**: `{msg}`\n\n"
     
     if len(records) > max_to_show:
-        response_text += f"\n... and {len(records) - max_to_show} more records in this page"
+        response_text += f"\n... and {len(records) - max_to_show} more records in this page\n"
     
-    # Add total info
-    if total_count > (offset + len(records)):
-        remaining = total_count - (offset + len(records))
-        response_text += f"\n\n📈 {remaining} more records available"
-    
-    # Add quick navigation buttons
+    # Build keyboard with navigation and quick actions
     keyboard = []
     
-    # Previous offset
-    if offset >= limit:
-        prev_offset = max(0, offset - limit)
-        keyboard.append([
-            InlineKeyboardButton("⬅️ Previous", callback_data=f"quick_limit_offset_{limit}_{prev_offset}"),
-        ])
+    # Navigation row: Previous and Next
+    nav_buttons = []
     
-    # Next offset
+    # Previous button
+    if offset > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"nav_prev_{limit}_{offset}"))
+    
+    # Page info button (non-clickable, just for display)
+    current_page = (offset // limit) + 1
+    total_pages = (total_count + limit - 1) // limit if total_count > 0 else 1
+    nav_buttons.append(InlineKeyboardButton(f"Page {current_page}/{total_pages}", callback_data="no_op"))
+    
+    # Next button
     if (offset + limit) < total_count:
-        next_offset = offset + limit
-        keyboard.append([
-            InlineKeyboardButton("Next ➡️", callback_data=f"quick_limit_offset_{limit}_{next_offset}"),
-        ])
+        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"nav_next_{limit}_{offset}"))
     
-    # Quick limit changes
-    quick_limits = [
-        (20, "20"),
-        (50, "50"),
-        (100, "100"),
-        (500, "500"),
-    ]
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+    
+    # Quick limit change row
+    limit_buttons = []
+    for lim in LIMIT_OPTIONS:
+        limit_buttons.append(InlineKeyboardButton(
+            f"Limit: {lim}", 
+            callback_data=f"change_limit_{lim}_{offset}"
+        ))
+    if limit_buttons:
+        keyboard.append(limit_buttons)
+    
+    # Quick offset jump row
+    offset_buttons = []
+    for off in OFFSET_OPTIONS:
+        offset_buttons.append(InlineKeyboardButton(
+            f"Offset: {off}",
+            callback_data=f"quick_limit_offset_{limit}_{off}"
+        ))
+    if offset_buttons:
+        keyboard.append(offset_buttons)
+    
+    # Back to menu
     keyboard.append([
-        InlineKeyboardButton(f"Limit: {label}", callback_data=f"quick_limit_offset_{lim}_{offset}")
-        for lim, label in quick_limits
+        InlineKeyboardButton("🔙 Back to Analyzed Menu", callback_data="cmd_getanalyzed"),
     ])
     
-    if keyboard:
-        reply_markup = InlineKeyboardMarkup(keyboard)
-    else:
-        reply_markup = None
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
         response_text,
