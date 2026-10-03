@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 API_BASE_URL = "http://localhost:8000"
 API_GET_CAMERA_RES = f"{API_BASE_URL}/api/getcamerares"
 API_GET_ANALYZED = f"{API_BASE_URL}/api/getanalyzed"
+API_HEALTH_CHECK = f"{API_BASE_URL}/api/health"
 
 # Predefined values for quick selection
 LIMIT_OPTIONS = [20, 50, 100, 500]
@@ -118,6 +119,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     elif data == "cmd_help":
         await help_command(update, context)
+
+    elif data == "cmd_health":
+        await check_health(update, context)
         
     elif data == "back_to_analyzed_menu":
         await show_analyzed_menu(query)
@@ -540,6 +544,93 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await fetch_camera_result(update, sscc)
 
 
+
+async def check_health(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle health button callback."""
+    await fetch_health_status(update, context)
+
+
+async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /health command."""
+    await fetch_health_status(update, context)
+
+
+async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYPE = None) -> None:
+    """Fetch health status from API and display all data."""
+    try:
+        response = requests.get(API_HEALTH_CHECK, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            health_text = "\U0001f9f0 *API Health Check*\n\n"
+            health_text += f"\u2699 *Status*: `{data.get('status', 'N/A')}`\n"
+            health_text += f"\u2022 *Version*: `{data.get('version', 'N/A')}`\n"
+            health_text += f"\u2022 *Semantic Version*: `{data.get('semantic_version', 'N/A')}`\n"
+            health_text += f"\u2022 *API Name*: `{data.get('api_name', 'N/A')}`\n"
+            health_text += f"\u2022 *Build Date*: `{data.get('build_date', 'N/A')}`\n"
+            health_text += f"\u2022 *Commit Count*: `{data.get('commit_count', 'N/A')}`\n\n"
+            
+            git_data = data.get('git', {})
+            if git_data:
+                health_text += "\U0001f4c1 *Git Info:*\n"
+                health_text += f"  \u2022 Commit Hash: `{git_data.get('short_hash', git_data.get('commit_hash', 'N/A'))}`\n"
+                health_text += f"  \u2022 Commit Date: `{git_data.get('commit_date', 'N/A')}`\n"
+                health_text += f"  \u2022 Commit Message: `{git_data.get('commit_message', 'N/A')}`\n"
+                health_text += f"  \u2022 Is Dirty: `{git_data.get('is_dirty', False)}`\n\n"
+            
+            scanned_dirs = data.get('scanned_dirs', {})
+            if scanned_dirs:
+                health_text += "\U0001f4c1 *Scanned Directories:*\n"
+                health_text += f"  \u2022 Today: `{scanned_dirs.get('today', 'N/A')}`\n"
+                health_text += f"  \u2022 This Week: `{scanned_dirs.get('this_week', 'N/A')}`\n"
+                health_text += f"  \u2022 Total: `{scanned_dirs.get('total', 'N/A')}`\n"
+                health_text += f"  \u2022 Min Size: `{scanned_dirs.get('min_size_mb', 'N/A')} MB`\n"
+                health_text += f"  \u2022 Threshold: `{scanned_dirs.get('threshold_mb', 'N/A')} MB`\n\n"
+            
+            disk_data = data.get('free_disk_space', {})
+            if disk_data:
+                health_text += "\U0001f4be *Disk Space:*\n"
+                for drive, info in disk_data.items():
+                    if info.get('available', False):
+                        free = info.get('free_gb', 'N/A')
+                        total = info.get('total_gb', 'N/A')
+                        used = info.get('used_percent', 'N/A')
+                        health_text += f"  \u2022 Drive {drive}: `{free} GB free` / `{total} GB total` ({used}% used)\n"
+                    else:
+                        error = info.get('error', 'N/A')
+                        health_text += f"  \u2022 Drive {drive}: \u274c `{error}`\n"
+            
+            if isinstance(update_or_query, Update):
+                await update_or_query.message.reply_text(health_text, parse_mode="Markdown")
+            else:
+                await update_or_query.edit_message_text(health_text, parse_mode="Markdown")
+        else:
+            error_msg = f"\u274c API Health Check Failed: {response.status_code}\nResponse: {response.text}"
+            if isinstance(update_or_query, Update):
+                await update_or_query.message.reply_text(error_msg)
+            else:
+                await update_or_query.edit_message_text(error_msg)
+    except requests.exceptions.Timeout:
+        error_msg = "\u23f0 Health check request timed out. Please check if the API is running."
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text(error_msg)
+        else:
+            await update_or_query.edit_message_text(error_msg)
+    except requests.exceptions.ConnectionError:
+        error_msg = "\ud83d\udd0c Cannot connect to the API. Make sure the localhost server is running on port 8000."
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text(error_msg)
+        else:
+            await update_or_query.edit_message_text(error_msg)
+    except Exception as e:
+        error_msg = f"\u274c Health check error: {str(e)}"
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text(error_msg)
+        else:
+            await update_or_query.edit_message_text(error_msg)
+
+
 def main() -> None:
     """Run the bot."""
     # Get bot token from environment variable
@@ -558,6 +649,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("getcamerares", get_camera_result))
     application.add_handler(CommandHandler("getanalyzed", get_analyzed_records))
+    application.add_handler(CommandHandler("health", health_check))
     
     # Add callback query handler
     application.add_handler(CallbackQueryHandler(button_handler))
