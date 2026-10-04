@@ -559,6 +559,7 @@ async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYPE = None) -> None:
     """Fetch health status from API and display all data."""
+    from telegram import CallbackQuery
     try:
         response = requests.get(API_HEALTH_CHECK, timeout=10)
         
@@ -603,15 +604,17 @@ async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYP
                         error = info.get('error', 'N/A')
                         health_text += f"  \u2022 Drive {drive}: \u274c `{error}`\n"
             
+            from telegram import Update, CallbackQuery
             if isinstance(update_or_query, Update):
                 await update_or_query.message.reply_text(health_text, parse_mode="Markdown")
-            else:
+            elif isinstance(update_or_query, CallbackQuery):
                 await update_or_query.edit_message_text(health_text, parse_mode="Markdown")
         else:
             error_msg = f"\u274c API Health Check Failed: {response.status_code}\nResponse: {response.text}"
+            from telegram import Update, CallbackQuery
             if isinstance(update_or_query, Update):
                 await update_or_query.message.reply_text(error_msg)
-            else:
+            elif isinstance(update_or_query, CallbackQuery):
                 await update_or_query.edit_message_text(error_msg)
     except requests.exceptions.Timeout:
         error_msg = "\u23f0 Health check request timed out. Please check if the API is running."
@@ -627,9 +630,10 @@ async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYP
             await update_or_query.edit_message_text(error_msg)
     except Exception as e:
         error_msg = f"\u274c Health check error: {str(e)}"
+        from telegram import Update, CallbackQuery
         if isinstance(update_or_query, Update):
             await update_or_query.message.reply_text(error_msg)
-        else:
+        elif isinstance(update_or_query, CallbackQuery):
             await update_or_query.edit_message_text(error_msg)
 
 
