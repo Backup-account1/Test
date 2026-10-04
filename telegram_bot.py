@@ -47,6 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             InlineKeyboardButton("📊 Get Analyzed Records", callback_data="cmd_getanalyzed"),
         ],
         [
+            InlineKeyboardButton("🧰 Health Check", callback_data="cmd_health"),
             InlineKeyboardButton("❓ Help", callback_data="cmd_help"),
         ],
     ]
@@ -57,6 +58,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Use the buttons below or commands:\n"
         "• /getcamerares <SSCC> - Get camera result\n"
         "• /getanalyzed <limit> <offset> - Get analyzed records\n"
+        "• /health - Check API health\n"
         "• /help - Show help",
         reply_markup=reply_markup,
     )
@@ -564,7 +566,7 @@ async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYP
             data = response.json()
             
             health_text = "\U0001f9f0 *API Health Check*\n\n"
-            health_text += f"\u2699 *Status*: `{data.get('status', 'N/A')}`\n"
+            health_text += f"\u2699 *Status*: `{data.get('status', 'N/A')}` - {data.get('status', 'N/A')}\n"
             health_text += f"\u2022 *Version*: `{data.get('version', 'N/A')}`\n"
             health_text += f"\u2022 *Semantic Version*: `{data.get('semantic_version', 'N/A')}`\n"
             health_text += f"\u2022 *API Name*: `{data.get('api_name', 'N/A')}`\n"
