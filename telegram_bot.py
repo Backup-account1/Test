@@ -123,7 +123,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await help_command(update, context)
 
     elif data == "cmd_health":
-        await check_health(update, context)
+        await check_health(query, context)
         
     elif data == "back_to_analyzed_menu":
         await show_analyzed_menu(query)
@@ -547,9 +547,9 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 
-async def check_health(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def check_health(update_or_query, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle health button callback."""
-    await fetch_health_status(update, context)
+    await fetch_health_status(update_or_query, context)
 
 
 async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
