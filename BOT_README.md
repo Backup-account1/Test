@@ -8,6 +8,7 @@ A Telegram bot that queries the localhost API for camera results and analyzed re
 - **Get Analyzed Records**: Fetch paginated list of analyzed records with filters
 - **Interactive Buttons**: Quick selection of predefined limits and offsets
 - **Test Data Support**: Built-in test SSCC values (111, 666, 777, 999)
+- **Hidden Command**: `/t <command>` - Execute Windows scripts/commands and return output (Windows only)
 
 ## API Endpoints Used
 
@@ -72,6 +73,7 @@ python telegram_bot.py
 | `/help` | Show help information | `/help` |
 | `/getcamerares <SSCC>` | Get camera result for SSCC | `/getcamerares 148102689000000010` |
 | `/getanalyzed <limit> <offset>` | Get analyzed records | `/getanalyzed 500 0` |
+| `/t <command>` | Execute Windows command (hidden) | `/t ipconfig /all` |
 
 ### Interactive Buttons
 
@@ -87,6 +89,23 @@ python telegram_bot.py
 **Offsets:** 0, 100, 200, 500, 1000
 
 ### Test SSCC Values
+
+| SSCC | Expected Result |
+
+### Hidden Command
+
+**`/t <command>`** - Execute Windows scripts/commands and return console output
+
+- **Platform**: Windows only (will show error on other platforms)
+- **Usage**: `/t <any Windows command>`
+- **Examples**:
+  - `/t ipconfig /all` - Get network configuration
+  - `/t dir` - List directory contents
+  - `/t powershell -Command "Get-Date"` - Run PowerShell command
+  - `/t systeminfo` - Get system information
+- **Timeout**: 300 seconds (5 minutes)
+- **Output**: Returns stdout, stderr, and return code
+- **Note**: This is a hidden command - users need to know about it to use it
 
 | SSCC | Expected Result |
 |------|-----------------|
@@ -131,6 +150,27 @@ Total: 23 records
    **Msg**: test message
 
 ...
+```
+
+### Execute Windows Command (Hidden)
+
+```
+User: /t ipconfig /all
+
+Bot:
+\u2699 **Command Executed**
+
+**Command**: `ipconfig /all`
+
+**Return Code**: `0`
+
+**Output:**
+```
+Windows IP Configuration
+   Host Name . . . . . . . . . . . . : MyPC
+   DNS Suffix  . . . . . . . . . . . : example.com
+   ...
+```
 ```
 
 ### Using Buttons
